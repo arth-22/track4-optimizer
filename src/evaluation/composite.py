@@ -128,30 +128,38 @@ class CompositeEvaluator:
         prompts: list[CanonicalPrompt],
         replays: list[ReplayResult],
         references: list[str | None] | None = None,
+        max_concurrent: int = 10,
     ) -> list[EvaluationResult]:
         """
-        Evaluate a batch of replays.
+        Evaluate a batch of replays with parallel execution.
         
-        Uses batch evaluation for efficiency where supported.
+        Uses asyncio.gather for concurrent evaluation with semaphore
+        to limit concurrency and respect rate limits.
+        
+        Args:
+            prompts: List of prompts
+            replays: List of replay results
+            references: Optional reference outputs
+            max_concurrent: Maximum concurrent evaluations (default: 10)
         """
+        import asyncio
+        
         refs = references or [None] * len(prompts)
-        results = []
-
-        # For now, process sequentially
-        # TODO: Implement true batch evaluation for efficiency
-        for prompt, replay, ref in zip(prompts, replays, refs):
-            try:
-                result = await self.evaluate(prompt, replay, ref)
-                results.append(result)
-            except Exception as e:
-                logger.error(
-                    "Batch evaluation failed for prompt",
-                    prompt_id=prompt.id,
-                    error=str(e),
-                )
-                # Return failed evaluation
-                results.append(
-                    EvaluationResult(
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def eval_with_limit(prompt, replay, ref) -> EvaluationResult:
+            """Evaluate with concurrency limit."""
+            async with semaphore:
+                try:
+                    return await self.evaluate(prompt, replay, ref)
+                except Exception as e:
+                    logger.error(
+                        "Batch evaluation failed for prompt",
+                        prompt_id=prompt.id,
+                        error=str(e),
+                    )
+                    # Return failed evaluation
+                    return EvaluationResult(
                         prompt_id=prompt.id,
                         model_id=replay.model_id,
                         metrics={},
@@ -165,9 +173,17 @@ class CompositeEvaluator:
                         refused=True,
                         refusal_reason=f"Evaluation error: {str(e)}",
                     )
-                )
-
-        return results
+        
+        # Create tasks for parallel execution
+        tasks = [
+            eval_with_limit(prompt, replay, ref)
+            for prompt, replay, ref in zip(prompts, replays, refs)
+        ]
+        
+        # Execute all evaluations concurrently
+        results = await asyncio.gather(*tasks)
+        
+        return list(results)
 
     def _calculate_composite_score(
         self,

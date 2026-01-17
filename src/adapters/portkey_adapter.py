@@ -1,4 +1,11 @@
-"""Portkey Log Export API adapter."""
+"""Portkey Log Export API adapter.
+
+Supports two methods:
+1. Direct logs API (/logs) - simpler, paginated
+2. Export API (/logs/exports) - for large datasets
+
+Also supports portkey-ai SDK if available.
+"""
 
 import uuid
 from datetime import datetime, timedelta
@@ -19,6 +26,13 @@ from src.models.canonical import (
     ComplexityLevel,
 )
 
+# Try to import portkey SDK
+try:
+    from portkey_ai import Portkey
+    PORTKEY_SDK_AVAILABLE = True
+except ImportError:
+    PORTKEY_SDK_AVAILABLE = False
+
 logger = structlog.get_logger()
 
 
@@ -36,15 +50,18 @@ class PortkeyLogAdapter(BaseAdapter):
     def __init__(
         self,
         api_key: str | None = None,
+        workspace_id: str | None = None,
         base_url: str = "https://api.portkey.ai/v1",
     ):
         settings = get_settings()
         self.api_key = api_key or settings.portkey_api_key
+        self.workspace_id = workspace_id or getattr(settings, 'portkey_workspace_id', None) or "ws-team-1-f28b06"
         self.base_url = base_url
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             headers={
                 "x-portkey-api-key": self.api_key,
+                "x-portkey-workspace-id": self.workspace_id,
                 "Content-Type": "application/json",
             },
             timeout=60.0,
@@ -60,7 +77,12 @@ class PortkeyLogAdapter(BaseAdapter):
         end_date: datetime | None = None,
         limit: int | None = None,
     ) -> list[CanonicalPrompt]:
-        """Fetch prompts from Portkey logs."""
+        """Fetch prompts from Portkey logs.
+        
+        Tries multiple methods in order:
+        1. Direct logs API (simpler, paginated)
+        2. Export API (for large datasets)
+        """
         # Default to last 30 days if no date range specified
         if end_date is None:
             end_date = datetime.utcnow()
@@ -74,22 +96,39 @@ class PortkeyLogAdapter(BaseAdapter):
             limit=limit,
         )
 
-        # Create export request
-        export = await self._create_export(start_date, end_date)
-        export_id = export.get("id")
+        # Try direct logs API first (simpler)
+        try:
+            logs = await self._fetch_logs_direct(start_date, end_date, limit or 100)
+            if logs:
+                logger.info("Fetched via direct API", count=len(logs))
+                return self._convert_logs_to_prompts(logs)
+        except Exception as e:
+            logger.warning("Direct logs API failed, trying export", error=str(e))
 
-        if not export_id:
-            logger.error("Failed to create export", response=export)
+        # Fallback to export API
+        try:
+            export = await self._create_export(start_date, end_date)
+            export_id = export.get("id")
+
+            if not export_id:
+                logger.error("Failed to create export", response=export)
+                return []
+
+            # Wait for export to complete and download
+            logs = await self._download_export(export_id)
+
+            # Apply limit
+            if limit and len(logs) > limit:
+                logs = logs[:limit]
+
+            return self._convert_logs_to_prompts(logs)
+
+        except Exception as e:
+            logger.error("Export API also failed", error=str(e))
             return []
 
-        # Wait for export to complete and download
-        logs = await self._download_export(export_id)
-
-        # Apply limit
-        if limit and len(logs) > limit:
-            logs = logs[:limit]
-
-        # Convert to canonical format
+    def _convert_logs_to_prompts(self, logs: list[dict]) -> list[CanonicalPrompt]:
+        """Convert raw logs to canonical prompts."""
         prompts = []
         for log in logs:
             try:
@@ -99,8 +138,46 @@ class PortkeyLogAdapter(BaseAdapter):
                 logger.warning("Failed to parse log entry", error=str(e), log_id=log.get("id"))
                 continue
 
-        logger.info("Fetched prompts from Portkey", count=len(prompts))
+        logger.info("Converted logs to prompts", count=len(prompts))
         return prompts
+
+    async def _fetch_logs_direct(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Fetch logs using direct /logs endpoint with pagination."""
+        all_logs = []
+        page = 1
+        page_size = min(limit, 100)  # API max per page
+        
+        while len(all_logs) < limit:
+            params = {
+                "page": page,
+                "page_size": page_size,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            }
+            
+            response = await self.client.get("/logs", params=params)
+            response.raise_for_status()
+            data = response.json()
+            
+            logs = data.get("data", data.get("logs", []))
+            if not logs:
+                break
+                
+            all_logs.extend(logs)
+            
+            # Check if more pages
+            has_more = data.get("has_more", len(logs) == page_size)
+            if not has_more:
+                break
+                
+            page += 1
+        
+        return all_logs[:limit]
 
     async def count_available(
         self,
@@ -127,11 +204,17 @@ class PortkeyLogAdapter(BaseAdapter):
         start_date: datetime,
         end_date: datetime,
     ) -> dict[str, Any]:
-        """Create a log export request."""
+        """Create a log export request using Portkey SDK pattern."""
+        # Use Portkey SDK if available for more reliable API calls
+        if PORTKEY_SDK_AVAILABLE:
+            return await self._create_export_via_sdk(start_date, end_date)
+        
+        # Fallback to httpx
         payload = {
+            "description": f"Track 4 Cost-Quality Analysis Export {datetime.utcnow().isoformat()}",
             "filters": {
-                "time_of_generation_min": start_date.isoformat(),
-                "time_of_generation_max": end_date.isoformat(),
+                "time_of_generation_min": start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "time_of_generation_max": end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
             },
             "requested_data": [
                 "id",
@@ -148,44 +231,205 @@ class PortkeyLogAdapter(BaseAdapter):
                 "cost_currency",
                 "response_time",
                 "response_status_code",
-                "is_success",
-                "metadata",
+                "config",
                 "prompt_slug",
+                "metadata",
             ],
         }
 
-        response = await self.client.post("/logs/exports", json=payload)
+        response = await self.client.post("/logs/exports", json=payload, timeout=120.0)
         response.raise_for_status()
         return response.json()
 
-    async def _download_export(self, export_id: str) -> list[dict[str, Any]]:
-        """Wait for export to complete and download results."""
+    async def _create_export_via_sdk(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> dict[str, Any]:
+        """Create export using Portkey SDK (more reliable)."""
+        from portkey_ai import Portkey
         import asyncio
+        
+        def _create():
+            portkey = Portkey(api_key=self.api_key)
+            export = portkey.logs.exports.create(
+                filters={
+                    "time_of_generation_min": start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "time_of_generation_max": end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                description=f"Track 4 Export {datetime.utcnow().isoformat()}",
+                requested_data=[
+                    "id", "trace_id", "created_at", "request", "response",
+                    "ai_org", "ai_model", "req_units", "res_units", "total_units",
+                    "cost", "cost_currency", "response_time", "response_status_code",
+                    "config", "prompt_slug", "metadata",
+                ],
+            )
+            # Convert to dict
+            if hasattr(export, 'model_dump'):
+                return export.model_dump()
+            elif hasattr(export, 'dict'):
+                return export.dict()
+            return dict(export)
+        
+        # Run sync SDK call in thread pool
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _create)
 
+    async def _download_export(self, export_id: str) -> list[dict[str, Any]]:
+        """Wait for export to complete, start it, and download results."""
+        import asyncio
+        
+        # CRITICAL: Must call start() after create()!
+        await self._start_export(export_id)
+        
         # Poll for completion
-        max_attempts = 60
-        for _ in range(max_attempts):
-            status = await self._get_export_status(export_id)
-            if status.get("status") == "completed":
+        max_attempts = 90  # 3 minutes max
+        for attempt in range(max_attempts):
+            status_data = await self._get_export_status(export_id)
+            status = status_data.get("status", "")
+            
+            logger.debug("Export status", attempt=attempt, status=status, export_id=export_id)
+            
+            if status in ["completed", "success"]:
+                logger.info("Export completed", export_id=export_id)
                 break
-            elif status.get("status") == "failed":
-                logger.error("Export failed", export_id=export_id, status=status)
+            elif status in ["failed", "error"]:
+                logger.error("Export failed", export_id=export_id, status=status_data)
                 return []
+                
             await asyncio.sleep(2)
         else:
             logger.error("Export timed out", export_id=export_id)
             return []
 
-        # Download export data
-        response = await self.client.get(f"/logs/exports/{export_id}/download")
-        response.raise_for_status()
-        return response.json().get("data", [])
+        # Download export data - get signed URL first
+        return await self._download_export_data(export_id)
+
+    async def _start_export(self, export_id: str) -> None:
+        """Start the export job (required after create)."""
+        try:
+            if PORTKEY_SDK_AVAILABLE:
+                await self._start_export_via_sdk(export_id)
+            else:
+                response = await self.client.post(f"/logs/exports/{export_id}/start", timeout=30.0)
+                response.raise_for_status()
+            logger.info("Export started", export_id=export_id)
+        except Exception as e:
+            logger.warning("Failed to start export (may already be running)", error=str(e))
+
+    async def _start_export_via_sdk(self, export_id: str) -> None:
+        """Start export using SDK."""
+        from portkey_ai import Portkey
+        import asyncio
+        
+        def _start():
+            portkey = Portkey(api_key=self.api_key)
+            portkey.logs.exports.start(export_id=export_id)
+        
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _start)
 
     async def _get_export_status(self, export_id: str) -> dict[str, Any]:
         """Get export status."""
-        response = await self.client.get(f"/logs/exports/{export_id}")
+        if PORTKEY_SDK_AVAILABLE:
+            return await self._get_export_status_via_sdk(export_id)
+        
+        response = await self.client.get(f"/logs/exports/{export_id}", timeout=30.0)
         response.raise_for_status()
         return response.json()
+
+    async def _get_export_status_via_sdk(self, export_id: str) -> dict[str, Any]:
+        """Get export status using SDK."""
+        from portkey_ai import Portkey
+        import asyncio
+        
+        def _retrieve():
+            portkey = Portkey(api_key=self.api_key)
+            result = portkey.logs.exports.retrieve(export_id=export_id)
+            if hasattr(result, 'model_dump'):
+                return result.model_dump()
+            elif hasattr(result, 'dict'):
+                return result.dict()
+            return dict(result)
+        
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _retrieve)
+
+    async def _download_export_data(self, export_id: str) -> list[dict[str, Any]]:
+        """Download export data via signed URL."""
+        import json as json_module
+        
+        if PORTKEY_SDK_AVAILABLE:
+            return await self._download_export_data_via_sdk(export_id)
+        
+        # Get download info (signed URL)
+        response = await self.client.get(f"/logs/exports/{export_id}/download", timeout=60.0)
+        response.raise_for_status()
+        download_info = response.json()
+        
+        signed_url = download_info.get("signed_url") or download_info.get("url")
+        
+        if signed_url:
+            # Download from signed URL
+            data_response = await self.client.get(signed_url, timeout=120.0)
+            content = data_response.text
+            
+            # Parse NDJSON (newline-delimited JSON)
+            return self._parse_ndjson(content)
+        else:
+            # Data might be directly in response
+            return download_info.get("data", [])
+
+    async def _download_export_data_via_sdk(self, export_id: str) -> list[dict[str, Any]]:
+        """Download export data using SDK."""
+        from portkey_ai import Portkey
+        import asyncio
+        import requests
+        import json as json_module
+        
+        def _download():
+            portkey = Portkey(api_key=self.api_key)
+            result = portkey.logs.exports.download(export_id=export_id)
+            
+            if hasattr(result, 'model_dump'):
+                download_data = result.model_dump()
+            elif hasattr(result, 'dict'):
+                download_data = result.dict()
+            else:
+                download_data = dict(result)
+            
+            signed_url = download_data.get("signed_url") or download_data.get("url")
+            
+            if signed_url:
+                # Download from signed URL
+                resp = requests.get(signed_url, timeout=120)
+                return resp.text
+            
+            return download_data.get("data", [])
+        
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, _download)
+        
+        if isinstance(result, str):
+            return self._parse_ndjson(result)
+        return result
+
+    def _parse_ndjson(self, content: str) -> list[dict[str, Any]]:
+        """Parse newline-delimited JSON (NDJSON) format."""
+        import json as json_module
+        
+        records = []
+        for line in content.strip().split('\n'):
+            if line.strip():
+                try:
+                    records.append(json_module.loads(line))
+                except json_module.JSONDecodeError as e:
+                    logger.warning("Failed to parse NDJSON line", error=str(e))
+                    continue
+        
+        logger.info("Parsed NDJSON records", count=len(records))
+        return records
 
     def _normalize_to_canonical(self, log: dict[str, Any]) -> CanonicalPrompt:
         """Convert Portkey log to canonical format."""
@@ -200,25 +444,47 @@ class PortkeyLogAdapter(BaseAdapter):
                 role = MessageRole(role_str)
             except ValueError:
                 role = MessageRole.USER
-            messages.append(Message(role=role, content=msg.get("content", "")))
+            
+            # Handle different content formats
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                # Handle Anthropic-style list format: [{"type": "text", "text": "..."}]
+                text_parts = []
+                for part in content:
+                    if isinstance(part, dict):
+                        text_parts.append(part.get("text", str(part)))
+                    else:
+                        text_parts.append(str(part))
+                content = " ".join(text_parts)
+            elif not isinstance(content, str):
+                content = str(content)
+            
+            messages.append(Message(role=role, content=content))
 
         # Parse response
         response = log.get("response", {})
         choices = response.get("choices", [{}])
         completion_text = ""
         if choices:
-            completion_text = choices[0].get("message", {}).get("content", "")
+            msg_content = choices[0].get("message", {}).get("content", "")
+            # Handle list-format content in response too
+            if isinstance(msg_content, list):
+                text_parts = []
+                for part in msg_content:
+                    if isinstance(part, dict):
+                        text_parts.append(part.get("text", str(part)))
+                    else:
+                        text_parts.append(str(part))
+                completion_text = " ".join(text_parts)
+            else:
+                completion_text = msg_content or ""
 
         # Extract model and provider
         model_id = log.get("ai_model", "unknown")
         provider = log.get("ai_org", "unknown")
 
-        # Parse timestamps
-        created_at_str = log.get("created_at")
-        if created_at_str:
-            created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
-        else:
-            created_at = datetime.utcnow()
+        # Parse timestamps - handle multiple formats
+        created_at = self._parse_timestamp(log.get("created_at"))
 
         # Calculate cost
         cost = log.get("cost", 0.0)
@@ -291,6 +557,57 @@ class PortkeyLogAdapter(BaseAdapter):
         else:
             return ComplexityLevel.MEDIUM
 
-    async def close(self):
-        """Close the HTTP client."""
+    def _parse_timestamp(self, timestamp_str: str | None) -> datetime:
+        """Parse timestamp from various formats."""
+        if not timestamp_str:
+            return datetime.utcnow()
+        
+        # Try ISO format first (most common)
+        try:
+            return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            pass
+        
+        # Try JS Date format: "Sat Jan 17 2026 09:22:04 GMT+0000 (Coordinated Universal Time)"
+        try:
+            # Remove timezone name in parentheses
+            if "(" in timestamp_str:
+                timestamp_str = timestamp_str.split("(")[0].strip()
+            
+            # Parse the date part
+            from email.utils import parsedate_to_datetime
+            return parsedate_to_datetime(timestamp_str)
+        except Exception:
+            pass
+        
+        # Try common formats
+        formats = [
+            "%a %b %d %Y %H:%M:%S GMT%z",  # JS Date with GMT offset
+            "%Y-%m-%dT%H:%M:%S.%fZ",  # ISO with milliseconds
+            "%Y-%m-%dT%H:%M:%SZ",  # ISO without milliseconds
+            "%Y-%m-%d %H:%M:%S",  # Simple datetime
+        ]
+        
+        for fmt in formats:
+            try:
+                return datetime.strptime(timestamp_str, fmt)
+            except ValueError:
+                continue
+        
+        # Fallback to current time
+        logger.warning("Could not parse timestamp, using current time", timestamp=timestamp_str)
+        return datetime.utcnow()
+
+    def close(self):
+        """Close the HTTP client (sync wrapper for async close)."""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.client.aclose())
+        except RuntimeError:
+            # No running loop, run synchronously
+            asyncio.run(self.client.aclose())
+
+    async def aclose(self):
+        """Close the HTTP client (async)."""
         await self.client.aclose()

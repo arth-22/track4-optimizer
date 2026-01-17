@@ -1,5 +1,6 @@
 """BERTScore evaluator for semantic similarity."""
 
+import hashlib
 import structlog
 
 from src.evaluation.base import BaseEvaluator
@@ -7,6 +8,9 @@ from src.models.canonical import CanonicalPrompt
 from src.models.evaluation import MetricScore, ReplayResult
 
 logger = structlog.get_logger()
+
+# Module-level cache for BERTScore results (persists across instances)
+_bertscore_cache: dict[str, dict[str, MetricScore]] = {}
 
 
 class BertScoreEvaluator(BaseEvaluator):
@@ -16,19 +20,30 @@ class BertScoreEvaluator(BaseEvaluator):
     BERTScore uses contextual embeddings to measure similarity,
     making it more robust than token-overlap metrics like ROUGE.
     
-    Runs locally without LLM API calls.
+    Features:
+    - Automatic language detection
+    - Caching for efficiency
+    - Runs locally without LLM API calls
     """
+
+    # BERTScore supported languages for rescale_with_baseline
+    SUPPORTED_LANGS = {"en", "de", "fr", "es", "zh", "ja", "ko", "ru", "ar", "nl", "pt"}
 
     def __init__(
         self,
-        model_type: str = "microsoft/deberta-xlarge-mnli",
+        model_type: str = "distilbert-base-uncased",  # Fast & small: ~250MB
         device: str | None = None,
         batch_size: int = 64,
+        auto_detect_language: bool = True,
+        enable_cache: bool = True,
     ):
         self.model_type = model_type
         self.device = device
         self.batch_size = batch_size
-        self._scorer = None
+        self.auto_detect_language = auto_detect_language
+        self.enable_cache = enable_cache
+        self._scorers: dict[str, object] = {}  # Cache scorers per language
+        self._default_lang = "en"
 
     @property
     def name(self) -> str:
@@ -41,22 +56,42 @@ class BertScoreEvaluator(BaseEvaluator):
     def requires_reference(self) -> bool:
         return True
 
-    def _get_scorer(self):
-        """Lazy load BERTScore scorer."""
-        if self._scorer is None:
+    def _detect_language(self, text: str) -> str:
+        """Detect language of text, falling back to English."""
+        if not self.auto_detect_language:
+            return self._default_lang
+        
+        try:
+            from langdetect import detect
+            detected = detect(text[:500])  # Use first 500 chars for speed
+            if detected in self.SUPPORTED_LANGS:
+                return detected
+            return self._default_lang
+        except Exception:
+            return self._default_lang
+
+    def _get_cache_key(self, candidate: str, reference: str) -> str:
+        """Generate cache key from candidate-reference pair."""
+        combined = f"{candidate}|||{reference}"
+        return hashlib.sha256(combined.encode()).hexdigest()[:32]
+
+    def _get_scorer(self, lang: str = "en"):
+        """Lazy load BERTScore scorer for specified language."""
+        if lang not in self._scorers:
             try:
                 from bert_score import BERTScorer
-                self._scorer = BERTScorer(
+                self._scorers[lang] = BERTScorer(
                     model_type=self.model_type,
                     device=self.device,
                     batch_size=self.batch_size,
+                    lang=lang,
                     rescale_with_baseline=True,
                 )
-                logger.info("BERTScore scorer initialized", model=self.model_type)
+                logger.info("BERTScore scorer initialized", model=self.model_type, lang=lang)
             except ImportError:
                 logger.error("bert-score not installed. Run: pip install bert-score")
                 raise
-        return self._scorer
+        return self._scorers[lang]
 
     async def evaluate(
         self,

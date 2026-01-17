@@ -1,0 +1,32 @@
+{
+    "gpt-4o": {
+        "input_per_million": 2.50,
+        "output_per_million": 10.00,
+        "currency": "USD",
+        "effective_date": "2026-01"
+    },
+    "gpt-4o-mini": {
+        "input_per_million": 0.15,
+        "output_per_million": 0.60,
+        "currency": "USD",
+        "effective_date": "2026-01"
+    },
+    "claude-sonnet-4-5": {
+        "input_per_million": 3.00,
+        "output_per_million": 15.00,
+        "currency": "USD",
+        "effective_date": "2026-01"
+    },
+    "claude-haiku-4-5-20251001": {
+        "input_per_million": 0.80,
+        "output_per_million": 4.00,
+        "currency": "USD",
+        "effective_date": "2026-01"
+    },
+    "gemini-2.5-flash": {
+        "input_per_million": 0.10,
+        "output_per_million": 0.40,
+        "currency": "USD",
+        "effective_date": "2026-01"
+    }
+}

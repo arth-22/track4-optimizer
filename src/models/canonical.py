@@ -112,6 +112,12 @@ class CanonicalPrompt(BaseModel):
 
     # Ground truth (if available)
     ground_truth: GroundTruth | None = None
+    
+    # Natural language of content (auto-detected or specified)
+    content_language: str = Field(
+        default="en",
+        description="ISO language code for prompt content (en, es, fr, de, etc.)"
+    )
 
     @property
     def prompt_text(self) -> str:

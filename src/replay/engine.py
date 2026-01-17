@@ -189,6 +189,47 @@ class ReplayEngine:
 
         logger.info("Batch replay complete", completed=completed)
 
+    async def replay_single_streaming(
+        self,
+        prompt: CanonicalPrompt,
+        model: ModelConfig,
+        temperature: float = 1.0,
+    ) -> AsyncIterator[str]:
+        """
+        Stream replay response chunks for real-time display.
+        
+        Yields text chunks as they arrive from the model.
+        Does not return full ReplayResult - use for UX only.
+        
+        Args:
+            prompt: The prompt to replay
+            model: Target model configuration
+            temperature: Sampling temperature
+            
+        Yields:
+            String chunks as they arrive
+        """
+        model_slug = model.get_model_slug()
+        messages = prompt.to_openai_messages()
+        
+        try:
+            stream = await self.client.chat.completions.create(
+                model=model_slug,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=model.max_output,
+                stream=True,
+                extra_headers={"x-portkey-provider": model.provider_slug},
+            )
+            
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+                    
+        except Exception as e:
+            logger.error("Streaming replay failed", error=str(e), model=model.model_id)
+            yield f"[Error: {str(e)}]"
+
     async def _make_request_with_retry(
         self,
         model_slug: str,

@@ -1,0 +1,29 @@
+{
+  "strategy": {
+    "mode": "conditional",
+    "conditions": [
+      {
+        "query": "$.metadata.complexity == 'simple'",
+        "then": "gpt-4o-mini"
+      },
+      {
+        "query": "$.metadata.complexity == 'medium'",
+        "then": "gpt-4o-mini"
+      }
+    ],
+    "default": "gpt-4o-mini"
+  },
+  "retry": {
+    "attempts": 3,
+    "on_status_codes": [
+      429,
+      500,
+      502,
+      503
+    ]
+  },
+  "cache": {
+    "mode": "semantic",
+    "max_age": 3600
+  }
+}

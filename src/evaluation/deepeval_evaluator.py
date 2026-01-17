@@ -192,10 +192,13 @@ Respond with ONLY a JSON object:
 
     def __init__(
         self,
-        judge_model: str = "gpt-4o-mini",
+        judge_model: str = "@openai/gpt-4o-mini",  # Use Portkey Model Catalog format
         portkey_api_key: str | None = None,
     ):
         self.judge_model = judge_model
+        # Ensure model uses Portkey Model Catalog format
+        if not self.judge_model.startswith("@"):
+            self.judge_model = f"@openai/{judge_model}"
         self.portkey_api_key = portkey_api_key or get_settings().portkey_api_key
         self._client = None
 
@@ -227,17 +230,23 @@ Respond with ONLY a JSON object:
                 timeout=30.0,
             )
 
+        # Build reference text safely
+        ref_text = reference
+        if not ref_text and prompt.completion:
+            ref_text = prompt.completion.text
+        ref_text = ref_text or "Not provided"
+
         judge_prompt = self.JUDGE_PROMPT.format(
             prompt=prompt.prompt_text,
-            response=replay.completion,
-            reference=reference or prompt.completion.text or "Not provided",
+            response=replay.completion or "No response",
+            reference=ref_text,
         )
 
         try:
             response = await self._client.post(
                 "/chat/completions",
                 json={
-                    "model": self.judge_model,
+                    "model": self.judge_model,  # Now uses @openai/gpt-4o-mini format
                     "messages": [{"role": "user", "content": judge_prompt}],
                     "temperature": 0.0,
                     "max_tokens": 200,

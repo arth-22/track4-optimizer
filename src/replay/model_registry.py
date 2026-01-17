@@ -183,3 +183,64 @@ class ModelRegistry:
         """Get the Portkey Model Catalog slug for a model."""
         model = cls.get_model(model_id)
         return model.get_model_slug() if model else None
+
+    @classmethod
+    def load_pricing_from_file(cls, filepath: str = "data/pricing.json") -> bool:
+        """
+        Load pricing from external JSON file.
+        
+        Allows updating pricing without code changes.
+        
+        Args:
+            filepath: Path to JSON file with pricing data
+            
+        Returns:
+            True if pricing was updated, False otherwise
+        """
+        import json
+        from pathlib import Path
+        
+        path = Path(filepath)
+        if not path.exists():
+            return False
+        
+        try:
+            with open(path) as f:
+                pricing_data = json.load(f)
+            
+            updated = 0
+            for model_id, prices in pricing_data.items():
+                if model_id in cls._models:
+                    cls._models[model_id].pricing = PricingInfo(
+                        input_per_million=prices.get("input_per_million", 0),
+                        output_per_million=prices.get("output_per_million", 0),
+                        currency=prices.get("currency", "USD"),
+                        effective_date=prices.get("effective_date", ""),
+                    )
+                    updated += 1
+            
+            return updated > 0
+        except Exception:
+            return False
+
+    @classmethod
+    def save_pricing_to_file(cls, filepath: str = "data/pricing.json") -> None:
+        """Save current pricing to JSON file for backup/editing."""
+        import json
+        from pathlib import Path
+        
+        pricing_data = {}
+        for model_id, config in cls._models.items():
+            pricing_data[model_id] = {
+                "input_per_million": config.pricing.input_per_million,
+                "output_per_million": config.pricing.output_per_million,
+                "currency": config.pricing.currency,
+                "effective_date": config.pricing.effective_date,
+            }
+        
+        path = Path(filepath)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(path, "w") as f:
+            json.dump(pricing_data, f, indent=2)
+
