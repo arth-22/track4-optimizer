@@ -1,0 +1,384 @@
+{
+  "metadata": {
+    "description": "Demo dataset for Track 4 Cost-Quality Optimization hackathon",
+    "evaluation_timestamp": "2026-01-17T19:05:00Z",
+    "total_records": 12,
+    "source": "historical_demo",
+    "original_model": "grok-4-latest",
+    "original_provider": "x-ai"
+  },
+  "prompts": [
+    {
+      "id": "demo-001",
+      "trace_id": "trace-demo-001",
+      "created_at": "2026-01-17T13:23:40Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful customer support assistant. Be concise and helpful."
+        },
+        {
+          "role": "user",
+          "content": "Summarize the following customer ticket in one sentence:\n\nTicket: Since yesterday evening, our dashboard has been loading extremely slowly. Multiple users across different departments have reported this issue. We've already tried clearing browser caches but the problem persists. This is affecting our ability to generate reports for the executive meeting tomorrow morning."
+        }
+      ],
+      "original_response": {
+        "content": "The ticket reports that the dashboard has been experiencing slow loading times since yesterday evening, affecting multiple users and departments, and is impacting the ability to generate reports for an upcoming executive meeting.",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 726,
+        "output_tokens": 32,
+        "total_tokens": 758,
+        "latency_ms": 5097,
+        "cost_usd": 0.2658,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "summarization",
+        "complexity": "simple",
+        "domain": "customer_support"
+      }
+    },
+    {
+      "id": "demo-002",
+      "trace_id": "trace-demo-002",
+      "created_at": "2026-01-17T13:24:07Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful customer support assistant. Be empathetic and professional."
+        },
+        {
+          "role": "user",
+          "content": "Draft a calm and empathetic response to a frustrated customer whose issue has been unresolved for three days. The customer is threatening to cancel their subscription.\n\nCustomer message: I've been waiting THREE DAYS for someone to fix my account issue! This is ridiculous! I pay premium prices and get zero support. If this isn't resolved TODAY I'm canceling my subscription and telling everyone about this terrible experience!"
+        }
+      ],
+      "original_response": {
+        "content": "Dear Valued Customer,\n\nI sincerely apologize for the frustration and inconvenience you've experienced over the past three days. Your feelings are completely valid, and I understand how disappointing it must be to wait this long for a resolution, especially as a premium subscriber who rightfully expects excellent support.\n\nI want to personally take ownership of your case and ensure we resolve this today. I'm escalating your issue to our senior support team immediately. You'll receive a direct call or email within the next 2 hours with a concrete solution.\n\nAs a gesture of goodwill for the trouble you've experienced, I'm also adding a credit to your account.\n\nThank you for your patience. We value your business and are committed to making this right.\n\nBest regards,\nSupport Team",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 703,
+        "output_tokens": 215,
+        "total_tokens": 918,
+        "latency_ms": 17428,
+        "cost_usd": 0.5334,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "creative_writing",
+        "complexity": "medium",
+        "domain": "customer_support"
+      }
+    },
+    {
+      "id": "demo-003",
+      "trace_id": "trace-demo-003",
+      "created_at": "2026-01-17T13:23:46Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a triage assistant. Extract key information from support tickets."
+        },
+        {
+          "role": "user",
+          "content": "Extract the key issue and urgency level (Low, Medium, High) from this ticket:\n\nTicket: Our production database server crashed at 3 AM and automatic failover didn't trigger. We're currently running on backup but it's at 90% capacity. Need immediate attention before the backup fails too. All customer-facing services are degraded."
+        }
+      ],
+      "original_response": {
+        "content": "**Key Issue:** Production database server crash with failed automatic failover. Currently running on backup at 90% capacity with degraded customer-facing services.\n\n**Urgency Level:** HIGH\n\n**Rationale:** System is in a critical state - backup is at near-capacity and at risk of failure. Customer impact is already occurring. Immediate intervention required to prevent complete outage.",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 718,
+        "output_tokens": 54,
+        "total_tokens": 772,
+        "latency_ms": 7109,
+        "cost_usd": 0.2964,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "extraction",
+        "complexity": "simple",
+        "domain": "technical_support"
+      }
+    },
+    {
+      "id": "demo-004",
+      "trace_id": "trace-demo-004",
+      "created_at": "2026-01-17T13:23:30Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a ticket classification assistant. Classify tickets into categories."
+        },
+        {
+          "role": "user",
+          "content": "Classify this support ticket into one category: Billing, Technical Issue, Account Management.\n\nTicket: I noticed I was charged twice for my monthly subscription last week. The amounts are $49.99 on Jan 10 and another $49.99 on Jan 12. Can you please refund the duplicate charge? My account number is AC-12345."
+        }
+      ],
+      "original_response": {
+        "content": "Billing",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 713,
+        "output_tokens": 1,
+        "total_tokens": 714,
+        "latency_ms": 4406,
+        "cost_usd": 0.2154,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "classification",
+        "complexity": "simple",
+        "domain": "billing"
+      }
+    },
+    {
+      "id": "demo-005",
+      "trace_id": "trace-demo-005",
+      "created_at": "2026-01-17T13:24:42Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a technical analyst. Analyze issues and identify root causes."
+        },
+        {
+          "role": "user",
+          "content": "Analyze the following ticket and identify possible root causes:\n\nTicket: Users in Europe are experiencing 5-10 second delays when accessing our application. The issue started about 2 hours ago. Users in North America report normal performance. Our monitoring shows normal CPU and memory usage across all servers. The issue seems to affect all European users regardless of their ISP."
+        }
+      ],
+      "original_response": {
+        "content": "**Root Cause Analysis:**\n\n**Most Likely Causes (in order of probability):**\n\n1. **CDN/Edge Server Issue**\n   - European CDN nodes may be experiencing problems\n   - Possible routing issues to European edge locations\n   - CDN cache invalidation or configuration change\n\n2. **DNS Resolution Delays**\n   - European DNS resolvers may have stale or problematic records\n   - Possible DNS propagation issues from recent changes\n\n3. **Network Routing/Peering Issues**\n   - Internet backbone issues between your datacenter and European ISPs\n   - Possible BGP routing problems\n\n4. **European Regional Database/API Latency**\n   - If using geo-distributed databases, European replica may be lagging\n   - Cross-region API calls taking longer than expected\n\n**Recommended Immediate Actions:**\n1. Check CDN dashboard for European region status\n2. Run traceroute from European location to identify network hops with latency\n3. Review recent deployments or configuration changes in the last 3 hours\n4. Check cloud provider status page for European regions",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 713,
+        "output_tokens": 300,
+        "total_tokens": 1013,
+        "latency_ms": 17791,
+        "cost_usd": 0.6639,
+        "finish_reason": "length"
+      },
+      "metadata": {
+        "task_type": "reasoning",
+        "complexity": "complex",
+        "domain": "technical_support"
+      }
+    },
+    {
+      "id": "demo-006",
+      "trace_id": "trace-demo-006",
+      "created_at": "2026-01-17T13:25:36Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a concise summarization assistant."
+        },
+        {
+          "role": "user",
+          "content": "Summarize this ticket briefly:\n\nTicket: Can you confirm whether your service supports single sign-on (SSO) with Okta? We're an enterprise customer evaluating your platform for our 500+ employee organization. We need SAML 2.0 compatibility and would like to know if you offer custom SSO integration support. Also, do you provide dedicated account management for enterprise accounts?"
+        }
+      ],
+      "original_response": {
+        "content": "Enterprise customer (500+ employees) inquiring about:\n1. Okta SSO compatibility (SAML 2.0)\n2. Custom SSO integration support\n3. Dedicated enterprise account management",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 706,
+        "output_tokens": 23,
+        "total_tokens": 729,
+        "latency_ms": 7939,
+        "cost_usd": 0.2463,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "summarization",
+        "complexity": "simple",
+        "domain": "sales"
+      }
+    },
+    {
+      "id": "demo-007",
+      "trace_id": "trace-demo-007",
+      "created_at": "2026-01-17T13:25:00Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a compliance and data privacy expert."
+        },
+        {
+          "role": "user",
+          "content": "Check if the following response complies with data privacy best practices:\n\nResponse: Please share your credit card number, expiration date, and CVV so I can process your payment manually. Also include your social security number for identity verification. Once you provide these details, I'll update your account immediately."
+        }
+      ],
+      "original_response": {
+        "content": "**COMPLIANCE STATUS: NON-COMPLIANT ❌**\n\n**Critical Privacy Violations Identified:**\n\n1. **Credit Card Data Collection via Unsecured Channel**\n   - Requesting full credit card details (number, CVV, expiration) violates PCI-DSS standards\n   - Payment information should NEVER be collected via chat/email\n   - Must use secure, tokenized payment forms\n\n2. **Social Security Number Request**\n   - Requesting SSN for \"identity verification\" is a major violation\n   - SSN should rarely, if ever, be collected for account verification\n   - Violates data minimization principles under GDPR and CCPA\n\n3. **Manual Processing Claim**\n   - \"Manual processing\" of sensitive data increases breach risk\n   - Suggests lack of proper security controls\n\n**Recommended Corrective Actions:**\n1. Remove this response template immediately\n2. Implement PCI-compliant payment processing\n3. Use proper identity verification (2FA, security questions)\n4. Train support staff on data privacy handling\n5. Report this as a potential compliance incident",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 711,
+        "output_tokens": 300,
+        "total_tokens": 1011,
+        "latency_ms": 16602,
+        "cost_usd": 0.6633,
+        "finish_reason": "length"
+      },
+      "metadata": {
+        "task_type": "reasoning",
+        "complexity": "complex",
+        "domain": "compliance"
+      }
+    },
+    {
+      "id": "demo-008",
+      "trace_id": "trace-demo-008",
+      "created_at": "2026-01-17T13:25:45Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful documentation assistant."
+        },
+        {
+          "role": "user",
+          "content": "Answer this customer question:\n\nQuestion: Where can I find your API rate limits documentation?"
+        }
+      ],
+      "original_response": {
+        "content": "You can find our API rate limits documentation in the following locations:\n\n1. **Developer Portal**: Visit developers.example.com/docs/rate-limits for detailed information on:\n   - Rate limits per endpoint\n   - Burst limits\n   - How to handle 429 (Too Many Requests) responses\n\n2. **API Reference**: Each endpoint in our API reference includes its specific rate limit in the response headers section.\n\n3. **Getting Started Guide**: The quick start guide at developers.example.com/quickstart includes a rate limits overview.\n\nIf you need higher rate limits for your use case, please contact our enterprise sales team.",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 701,
+        "output_tokens": 150,
+        "total_tokens": 851,
+        "latency_ms": 11391,
+        "cost_usd": 0.4353,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "qa",
+        "complexity": "simple",
+        "domain": "documentation"
+      }
+    },
+    {
+      "id": "demo-009",
+      "trace_id": "trace-demo-009",
+      "created_at": "2026-01-17T13:26:00Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a code generation assistant. Write clean, well-documented code."
+        },
+        {
+          "role": "user",
+          "content": "Write a Python function that validates an email address using regex. Include docstring and type hints."
+        }
+      ],
+      "original_response": {
+        "content": "```python\nimport re\nfrom typing import bool\n\ndef validate_email(email: str) -> bool:\n    \"\"\"\n    Validate an email address using regex.\n    \n    Args:\n        email: The email address string to validate.\n        \n    Returns:\n        True if the email is valid, False otherwise.\n        \n    Examples:\n        >>> validate_email('user@example.com')\n        True\n        >>> validate_email('invalid-email')\n        False\n    \"\"\"\n    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'\n    return bool(re.match(pattern, email))\n```",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 680,
+        "output_tokens": 145,
+        "total_tokens": 825,
+        "latency_ms": 9500,
+        "cost_usd": 0.3900,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "code_generation",
+        "complexity": "medium",
+        "domain": "programming"
+      }
+    },
+    {
+      "id": "demo-010",
+      "trace_id": "trace-demo-010",
+      "created_at": "2026-01-17T13:26:30Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a translation assistant. Translate accurately while preserving meaning."
+        },
+        {
+          "role": "user",
+          "content": "Translate the following English text to Spanish:\n\nText: Thank you for contacting our support team. We have received your request and will respond within 24 hours. In the meantime, please check our FAQ section for common solutions."
+        }
+      ],
+      "original_response": {
+        "content": "Gracias por contactar a nuestro equipo de soporte. Hemos recibido su solicitud y responderemos dentro de 24 horas. Mientras tanto, por favor consulte nuestra sección de preguntas frecuentes para encontrar soluciones comunes.",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 695,
+        "output_tokens": 48,
+        "total_tokens": 743,
+        "latency_ms": 6200,
+        "cost_usd": 0.2800,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "translation",
+        "complexity": "simple",
+        "domain": "customer_support"
+      }
+    },
+    {
+      "id": "demo-011",
+      "trace_id": "trace-demo-011",
+      "created_at": "2026-01-17T13:27:00Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a sentiment analysis assistant."
+        },
+        {
+          "role": "user",
+          "content": "Analyze the sentiment of this customer feedback and provide a score from 1-5 (1=very negative, 5=very positive):\n\nFeedback: I've been using this product for 6 months now and it's been mostly reliable. There were a few hiccups in the beginning, but customer support was responsive and helped resolve them quickly. The recent update improved performance significantly. Would recommend to others looking for a solid solution."
+        }
+      ],
+      "original_response": {
+        "content": "**Sentiment Score: 4/5 (Positive)**\n\n**Analysis:**\n- Overall positive experience over 6 months\n- Acknowledges initial issues (minor negative)\n- Praises customer support responsiveness (positive)\n- Highlights improvement from recent update (positive)\n- Willing to recommend to others (strong positive indicator)\n\nThe feedback shows a satisfied customer who experienced some early challenges but had them resolved satisfactorily, resulting in continued positive usage.",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 720,
+        "output_tokens": 95,
+        "total_tokens": 815,
+        "latency_ms": 8900,
+        "cost_usd": 0.3600,
+        "finish_reason": "stop"
+      },
+      "metadata": {
+        "task_type": "classification",
+        "complexity": "medium",
+        "domain": "customer_feedback"
+      }
+    },
+    {
+      "id": "demo-012",
+      "trace_id": "trace-demo-012",
+      "created_at": "2026-01-17T13:24:26Z",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are an escalation decision assistant."
+        },
+        {
+          "role": "user",
+          "content": "Determine whether this ticket should be escalated to engineering or handled by support:\n\nTicket: Our integration with your API stopped working after your system update yesterday. We're getting 500 errors on all endpoints. This is blocking our production deployment. Error message: 'Internal Server Error - Database connection pool exhausted'. We've confirmed our API keys are valid and haven't changed our code."
+        }
+      ],
+      "original_response": {
+        "content": "**Escalation Decision: ESCALATE TO ENGINEERING ✅**\n\n**Rationale:**\n\n1. **Server-Side Error (500)**: The error is on the provider's side, not client-side\n2. **Database Connection Pool Exhausted**: This is an infrastructure/backend issue requiring engineering intervention\n3. **Started After System Update**: Clear correlation with a provider-side change\n4. **Affects All Endpoints**: Systemic issue, not isolated to specific functionality\n5. **Customer Has Verified Their Side**: API keys valid, no code changes\n\n**Recommended Actions:**\n1. Immediately escalate to backend/infrastructure team\n2. Check if other customers are affected (potential incident)\n3. Investigate database connection pool settings post-update\n4. Provide customer with incident ticket number\n5. Set up proactive status updates\n\n**Support's Role:**\n- Keep customer informed\n- Document timeline and impact\n- Coordinate communication between customer and engineering",
+        "model": "grok-4-latest",
+        "provider": "x-ai",
+        "input_tokens": 714,
+        "output_tokens": 300,
+        "total_tokens": 1014,
+        "latency_ms": 14933,
+        "cost_usd": 0.6642,
+        "finish_reason": "length"
+      },
+      "metadata": {
+        "task_type": "reasoning",
+        "complexity": "complex",
+        "domain": "technical_support"
+      }
+    }
+  ]
+}

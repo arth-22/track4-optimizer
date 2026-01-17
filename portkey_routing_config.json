@@ -9,6 +9,10 @@
       {
         "query": "$.metadata.complexity == 'medium'",
         "then": "gpt-4o-mini"
+      },
+      {
+        "query": "$.metadata.complexity == 'complex'",
+        "then": "gpt-4o-mini"
       }
     ],
     "default": "gpt-4o-mini"

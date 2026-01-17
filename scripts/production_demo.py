@@ -80,7 +80,7 @@ async def fetch_real_logs(
     limit: int,
     days_back: int = 7,
 ) -> list:
-    """Fetch REAL logs from Portkey or CSV."""
+    """Fetch REAL logs from Portkey, CSV, or demo file."""
     
     if source == "portkey":
         print("📥 Fetching logs from Portkey Log Export API...")
@@ -122,8 +122,31 @@ async def fetch_real_logs(
         print(f"✓ Loaded {len(prompts)} prompts from file")
         return prompts
     
+    elif source == "demo":
+        # Demo mode - uses historical_prompts.json for hackathon demo
+        from src.adapters import HistoricalAdapter
+        
+        demo_file = file_path or str(Path(__file__).parent.parent / "docs" / "historical_prompts.json")
+        
+        if not os.path.exists(demo_file):
+            print(f"❌ Demo file not found: {demo_file}")
+            return []
+        
+        print(f"📥 Loading DEMO data from {demo_file}...")
+        print("   (This data will go through REAL ReplayEngine + Evaluation)")
+        
+        adapter = HistoricalAdapter(demo_file)
+        prompts = await adapter.fetch_prompts(limit=limit)
+        
+        # Store adapter for reference access later
+        fetch_real_logs._demo_adapter = adapter
+        
+        print(f"✓ Loaded {len(prompts)} demo prompts")
+        print(f"   Task types: {set(p.metadata.task_type.value for p in prompts)}")
+        return prompts
+    
     else:
-        print(f"❌ Unknown source: {source}")
+        print(f"❌ Unknown source: {source}. Use: portkey, csv, or demo")
         return []
 
 
@@ -412,9 +435,9 @@ Examples:
     
     parser.add_argument(
         "--source",
-        choices=["portkey", "csv"],
+        choices=["portkey", "csv", "demo"],
         default="portkey",
-        help="Data source: 'portkey' (API) or 'csv' (file)",
+        help="Data source: 'portkey' (API), 'csv' (file), or 'demo' (historical_prompts.json)",
     )
     parser.add_argument(
         "--file",
