@@ -91,19 +91,48 @@ track4-optimizer/
 ├── src/
 │   ├── adapters/          # Data ingestion (Portkey logs, CSV/JSON)
 │   ├── replay/            # Replay engine with Model Catalog
-│   ├── evaluation/        # Quality metrics (BERTScore, DeepEval, Cost)
-│   ├── analysis/          # Statistics, Pareto, Recommendations
+│   ├── evaluation/        # Quality metrics (BERTScore, DeepEval, Guardrails)
+│   ├── analysis/          # Statistics, Pareto, Anomaly Detection
 │   ├── api/               # FastAPI endpoints
 │   ├── models/            # Pydantic data models
 │   └── db/                # SQLAlchemy persistence (optional)
 ├── scripts/
 │   ├── demo.py            # Demo script
+│   ├── production_demo.py # Production demo with real Portkey data
 │   ├── test_portkey.py    # Connection test
 │   └── generate_synthetic_data.py
 ├── tests/                 # 29 unit/integration tests
 ├── requirements.txt
 └── .env.example
 ```
+
+---
+
+## 🔥 Production Demo (Real Data)
+
+Run the full pipeline with **real Portkey logs**:
+
+```bash
+# Standard run (50 prompts, 5 models)
+python3 scripts/production_demo.py --source portkey --limit 50 -y
+
+# Quick mode (faster, skips BERTScore)
+python3 scripts/production_demo.py --source portkey --limit 20 --quick -y
+
+# Daemon mode (continuous execution every 6 hours)
+python3 scripts/production_demo.py --source portkey --limit 50 --daemon --interval 6 -y
+```
+
+### Production Features
+
+| Feature | Description |
+|---------|-------------|
+| **Daemon Mode** | `--daemon` runs continuously at `--interval` hours |
+| **Real Portkey Logs** | Uses Log Export API (create → start → poll → download) |
+| **Guardrails** | Toxicity, PII leakage, prompt injection detection |
+| **Anomaly Detection** | LLM-powered pattern analysis |
+| **Graceful Degradation** | Fallback evaluators when primary fails |
+| **LLM Segmentation** | AI-driven prompt categorization |
 
 ---
 

@@ -366,7 +366,12 @@ async def run_production_demo(
     pareto_models = pareto.find_pareto_frontier(model_results)
     
     viz = VisualizationGenerator()
-    report_html = viz.generate_full_report(recommendation, model_results, pareto_models)
+    report_html = viz.generate_premium_report(
+        recommendation,
+        model_results,
+        pareto_models,
+        prompts_analyzed=len(prompts),
+    )
     
     # Save report
     report_path = Path(__file__).parent.parent / "production_report.html"
@@ -432,13 +437,57 @@ Examples:
         action="store_true",
         help="Skip confirmation prompt",
     )
+    parser.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Daemon mode: run continuously at specified interval",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=6,
+        help="Hours between runs in daemon mode (default: 6)",
+    )
     
     args = parser.parse_args()
     
-    asyncio.run(run_production_demo(
-        source=args.source,
-        file_path=args.file,
-        limit=args.limit,
-        quick_mode=args.quick,
-        skip_confirmation=args.yes,
-    ))
+    if args.daemon:
+        print(f"🔄 Starting daemon mode (interval: {args.interval}h)")
+        print("   Press Ctrl+C to stop\n")
+        
+        run_count = 0
+        while True:
+            run_count += 1
+            print(f"\n{'='*70}")
+            print(f"  DAEMON RUN #{run_count}")
+            print(f"{'='*70}")
+            
+            try:
+                asyncio.run(run_production_demo(
+                    source=args.source,
+                    file_path=args.file,
+                    limit=args.limit,
+                    quick_mode=args.quick,
+                    skip_confirmation=True,  # Always skip in daemon mode
+                ))
+            except KeyboardInterrupt:
+                print("\n🛑 Daemon stopped by user")
+                break
+            except Exception as e:
+                print(f"❌ Run #{run_count} failed: {e}")
+            
+            print(f"\n⏰ Next run in {args.interval} hour(s)...")
+            try:
+                import time
+                time.sleep(args.interval * 3600)
+            except KeyboardInterrupt:
+                print("\n🛑 Daemon stopped by user")
+                break
+    else:
+        asyncio.run(run_production_demo(
+            source=args.source,
+            file_path=args.file,
+            limit=args.limit,
+            quick_mode=args.quick,
+            skip_confirmation=args.yes,
+        ))

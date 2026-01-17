@@ -89,17 +89,22 @@ class CompositeEvaluator:
         """
         all_metrics: dict[str, MetricScore] = {}
 
-        # Run each evaluator
+        # Run each evaluator with graceful degradation
         for evaluator in self.evaluators:
             try:
                 metrics = await evaluator.evaluate(prompt, replay, reference)
                 all_metrics.update(metrics)
             except Exception as e:
                 logger.warning(
-                    f"Evaluator {evaluator.name} failed",
+                    f"Evaluator {evaluator.name} failed, using fallback",
                     error=str(e),
                     prompt_id=prompt.id,
                 )
+                # Graceful degradation: use basic fallback
+                fallback = await self._fallback_evaluate(
+                    evaluator.name, replay.completion, reference
+                )
+                all_metrics.update(fallback)
 
         # Calculate cost
         cost = self.cost_tracker.calculate_cost(
@@ -224,4 +229,40 @@ class CompositeEvaluator:
         return {
             "evaluators": [e.get_config() for e in self.evaluators],
             "weights": self.weights,
+        }
+
+    async def _fallback_evaluate(
+        self,
+        evaluator_name: str,
+        candidate: str,
+        reference: str | None,
+    ) -> dict[str, MetricScore]:
+        """
+        Fallback evaluation when primary evaluator fails.
+        
+        Uses basic text similarity as a graceful degradation strategy.
+        """
+        if not reference or not candidate:
+            return {}
+        
+        # Basic word overlap similarity
+        cand_words = set(candidate.lower().split())
+        ref_words = set(reference.lower().split())
+        
+        if not ref_words:
+            return {}
+        
+        overlap = len(cand_words & ref_words)
+        precision = overlap / len(cand_words) if cand_words else 0
+        recall = overlap / len(ref_words) if ref_words else 0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        
+        return {
+            f"{evaluator_name}_fallback": MetricScore(
+                metric_name=f"{evaluator_name}_fallback",
+                score=f1,
+                reason=f"Fallback: basic word overlap (primary {evaluator_name} failed)",
+                passed=f1 > 0.3,
+                threshold=0.3,
+            )
         }
